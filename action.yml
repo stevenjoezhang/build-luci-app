@@ -96,12 +96,11 @@ runs:
       shell: bash
       run: |
         mkdir -p artifacts
-        find /tmp/SDK/bin \
-             -type f -name "luci-*${{ inputs.package }}*_all.ipk" \
-             -exec cp {} artifacts/ \;
-        find /tmp/SNAPSDK/bin \
-             -type f -name "luci-*${{ inputs.package }}-*.apk" \
-             -exec cp {} artifacts/ \;
+        # Copy IPK from legacy SDK
+        cp /tmp/SDK/bin/ar71xx/packages/base/luci-*_all.ipk "./artifacts/"
+
+        # Copy APK from SNAPSHOT SDK
+        cp /tmp/SNAPSDK/bin/packages/x86_64/base/luci-*.apk "./artifacts/"
         echo "v${{ steps.get_version.outputs.version }}" \
           > artifacts/version.txt
 
