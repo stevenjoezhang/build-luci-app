@@ -9,7 +9,11 @@ inputs:
     required: true
   snapsdk-url:
     description: "Snapshot OpenWrt SDK .tar.zst URL"
-    required: true
+    required: false
+  snapsdk-profiles-url:
+    description: "Snapshot OpenWrt profiles.json URL used to resolve the current SDK archive"
+    required: false
+    default: "https://downloads.openwrt.org/snapshots/targets/x86/64/profiles.json"
 
 outputs:
   version:
@@ -54,12 +58,57 @@ runs:
         tar xf /tmp/SDK.tar.xz \
             --strip-components=1 -C /tmp/SDK
 
+    - name: Resolve Snapshot OpenWrt SDK URL
+      id: resolve_snapsdk
+      shell: bash
+      run: |
+        profiles_url="${{ inputs['snapsdk-profiles-url'] }}"
+
+        if [ -n "$profiles_url" ]; then
+          curl --fail --show-error -SLk --connect-timeout 30 --retry 2 \
+            "$profiles_url" \
+            -o /tmp/openwrt-profiles.json
+
+          sdk_file="$(python3 - <<'PY'
+        import json
+
+        with open("/tmp/openwrt-profiles.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        arch = data.get("arch_packages")
+        sdk = data.get("sdk", {})
+
+        if not arch:
+            raise SystemExit("profiles.json does not contain arch_packages")
+
+        if arch not in sdk:
+            raise SystemExit(f"profiles.json does not contain sdk entry for arch_packages={arch!r}")
+
+        print(sdk[arch])
+        PY
+        )"
+
+          base_url="${profiles_url%/*}"
+          echo "url=${base_url}/${sdk_file}" >> "$GITHUB_OUTPUT"
+          echo "Resolved snapshot SDK: ${base_url}/${sdk_file}"
+          exit 0
+        fi
+
+        if [ -n "${{ inputs['snapsdk-url'] }}" ]; then
+          echo "url=${{ inputs['snapsdk-url'] }}" >> "$GITHUB_OUTPUT"
+          echo "Using configured snapshot SDK: ${{ inputs['snapsdk-url'] }}"
+          exit 0
+        fi
+
+        echo "Either snapsdk-profiles-url or snapsdk-url must be provided" >&2
+        exit 1
+
     - name: Download Snapshot OpenWrt SDK
       shell: bash
       run: |
         mkdir -p /tmp/SNAPSDK
-        curl -SLk --connect-timeout 30 --retry 2 \
-          "${{ inputs['snapsdk-url'] }}" \
+        curl --fail --show-error -SLk --connect-timeout 30 --retry 2 \
+          "${{ steps.resolve_snapsdk.outputs.url }}" \
           -o /tmp/SNAPSDK.tar.zst
         zstd -d /tmp/SNAPSDK.tar.zst
         tar xf /tmp/SNAPSDK.tar \

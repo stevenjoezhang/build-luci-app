@@ -19,7 +19,8 @@ A reusable GitHub Actions Composite Action to compile an OpenWrt LuCI package in
 |------------|----------|----------------------------------------------------------------------|
 | `package`  | yes      | The folder name of your LuCI package (e.g. `luci-app-tailscale`).   |
 | `sdk-url`  | yes      | URL to the legacy OpenWrt SDK archive (`.tar.xz` format).                  |
-| `snapsdk-url` | yes   | URL to the snapshot OpenWrt SDK archive (`.tar.zst` format).                |
+| `snapsdk-profiles-url` | no | URL to the snapshot `profiles.json` used to resolve the current SDK archive. Defaults to the x86/64 snapshot profiles. |
+| `snapsdk-url` | no   | Fallback URL to the snapshot OpenWrt SDK archive (`.tar.zst` format). Used only when `snapsdk-profiles-url` is empty. |
 
 ## Outputs
 
@@ -50,7 +51,7 @@ jobs:
         with:
           package: luci-app-your-app
           sdk-url:  https://archive.openwrt.org/releases/19.07.0/.../OpenWrt-SDK.tar.xz
-          snapsdk-url: https://downloads.openwrt.org/snapshots/.../openwrt-sdk.tar.zst
+          snapsdk-profiles-url: https://downloads.openwrt.org/snapshots/targets/x86/64/profiles.json
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
