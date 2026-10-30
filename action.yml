@@ -7,6 +7,10 @@ inputs:
   sdk-url:
     description: "Legacy OpenWrt SDK .tar.xz URL"
     required: true
+  apk-sdk-version:
+    description: "APK SDK release: 'stable' for the latest official release, or a version such as '25.12.6'. Overrides snapsdk inputs when set."
+    required: false
+    default: ""
   snapsdk-url:
     description: "Snapshot OpenWrt SDK .tar.zst URL"
     required: false
@@ -44,7 +48,7 @@ runs:
         sudo add-apt-repository ppa:deadsnakes/ppa
         sudo apt-get update
         sudo DEBIAN_FRONTEND=noninteractive \
-          apt-get install -y curl git tar zstd python3-pip python3.9 python3.9-distutils
+          apt-get install -y curl wget jq git tar zstd python3-pip python3.9 python3.9-distutils
         pip3 install --upgrade pip
         pip3 install po2lmo
 
@@ -58,7 +62,16 @@ runs:
         tar xf /tmp/SDK.tar.xz \
             --strip-components=1 -C /tmp/SDK
 
+    - name: Download Release OpenWrt SDK for APK
+      if: ${{ inputs['apk-sdk-version'] != '' }}
+      shell: bash
+      env:
+        APK_SDK_VERSION: ${{ inputs['apk-sdk-version'] }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/scripts/download-release-sdk.sh" "$APK_SDK_VERSION" /tmp/SNAPSDK
+
     - name: Resolve Snapshot OpenWrt SDK URL
+      if: ${{ inputs['apk-sdk-version'] == '' }}
       id: resolve_snapsdk
       shell: bash
       run: |
@@ -104,6 +117,7 @@ runs:
         exit 1
 
     - name: Download Snapshot OpenWrt SDK
+      if: ${{ inputs['apk-sdk-version'] == '' }}
       shell: bash
       run: |
         mkdir -p /tmp/SNAPSDK
@@ -134,7 +148,7 @@ runs:
         make defconfig
         make package/${{ inputs.package }}/compile V=99
 
-    - name: Compile APK with Snapshot SDK
+    - name: Compile APK with Selected SDK
       shell: bash
       run: |
         cd /tmp/SNAPSDK
@@ -151,7 +165,7 @@ runs:
         # Copy IPK from legacy SDK
         cp /tmp/SDK/bin/packages/x86_64/base/luci-*_all.ipk "./artifacts/"
 
-        # Copy APK from SNAPSHOT SDK
+        # Copy APK from the selected release or snapshot SDK
         cp /tmp/SNAPSDK/bin/packages/x86_64/base/luci-*.apk "./artifacts/"
         echo "v${{ steps.get_version.outputs.version }}" \
           > artifacts/version.txt
